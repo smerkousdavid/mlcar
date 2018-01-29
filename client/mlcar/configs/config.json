@@ -1,0 +1,22 @@
+{
+  "ser_port": "/dev/ttyUSB0", 
+  "ser_baud": 115200, 
+  "display": {
+    "camera_url": "http://mlcar:8080", 
+    "width": 640, 
+    "height": 320
+  }, 
+  "vision": {
+    "stream": 3, 
+    "min_v": 128, 
+    "max_h": 154, 
+    "min_s": 41, 
+    "max_v": 255, 
+    "min_h": 38, 
+    "min_angle": 0, 
+    "blur": 23, 
+    "max_angle": 90, 
+    "max_s": 255
+  }, 
+  "address": "tcp://mlcar:9090"
+}
