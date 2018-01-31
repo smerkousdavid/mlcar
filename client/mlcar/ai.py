@@ -1,10 +1,11 @@
-from tensorforce.agents import PPOAgent
-from mlcar.neuralnet.network import NeuralNetwork
-from mlcar.neuralnet.genetic import *
-from mlcar.configs import linear_map
-from mlcar.logger import Logger
 from datetime import datetime
 from os.path import splitext
+
+from tensorforce.agents import PPOAgent
+
+from configs import linear_map
+from logger import Logger
+from neuralnet.genetic import *
 
 min_car_speed = 0.1
 max_car_speed = 0.135

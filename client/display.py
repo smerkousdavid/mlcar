@@ -1,19 +1,22 @@
-from mlcar.ai import AI, save_model_location
-from mlcar.configs import load_configs, get_configs, save_configs, linear_map
-from mlcar.communicate import Communicate
-from mlcar.controller import Controller
-from mlcar.logger import Logger
-from nanomsg import NanoMsgAPIError, NanoMsgError
+import tkFileDialog
+import urllib
+from Tkinter import *
+from datetime import datetime
 from threading import Thread
 from time import sleep
-from Tkinter import *
 from ttk import Style, Label, OptionMenu, Button
-from PIL import Image, ImageTk
 
-import tkFileDialog
-import numpy as np
-import urllib
 import cv2
+import numpy as np
+from PIL import Image, ImageTk
+from nanomsg import NanoMsgAPIError, NanoMsgError
+
+from mlcar.ai import AI, save_model_location
+from mlcar.communicate import Communicate
+from mlcar.configs import load_configs, get_configs, save_configs, linear_map
+from mlcar.controller import Controller
+from mlcar.logger import Logger
+from mlcar.logging.data import DataLogger
 
 log = Logger("display")
 
@@ -45,6 +48,7 @@ max_angle_var = None
 generation_var = None
 trial_var = None
 enable_var = None
+enabled_var = None
 prev_blur = 1
 blur_var = None
 width = None
@@ -53,6 +57,8 @@ frame = None
 enabled = False
 cont = None
 agent = None
+time_start = None
+data_log = None
 
 
 def clean_drive(current, future):
@@ -87,8 +93,10 @@ def clean_turn(from_camera):
 
 def static_drive(data):
     global cont
-    cont.drive(clean_drive(data["cd"], data["fd"]),
-               clean_turn(((-data["cd"] * 0.3) + (-data["fd"] * 1.6)) / 2.0))
+    power = clean_drive(data["cd"], data["fd"])
+    turn = clean_turn(((-data["cd"] * 0.3) + (-data["fd"] * 1.6)) / 2.0)
+    cont.drive(power, turn)
+    return power, turn
 
 
 def ai_drive(data):
@@ -96,6 +104,7 @@ def ai_drive(data):
     actions = agent.run(data["cd"], data["fd"])
     log.info("Predictions: %s" % str(actions))
     cont.drive(actions[0], actions[1])
+    return actions[0], actions[1]
 
 
 def communicate():
@@ -110,15 +119,22 @@ def communicate():
             else:
                 log.debug("Cpos: %.5f --- Fpos: %.5f" % (data["cd"], data["fd"]))
                 if enabled:
-                    static_drive(data)
+                    power, turn = static_drive(data)
+                    viewable = True
                     if data["cd"] == -2.0 or data["fd"] == -2.0 or \
                                     "0.09091" in ("%.5f" % data["cd"]) or \
                                     "0.09091" in ("%.5f" % data["fd"]):
                         log.error("AI went off course")
+                        data["cd"] = -1.0
+                        data["fd"] = -1.0
+                        viewable = False
                         # agent.no_lane()
                     else:
                         pass
                         # ai_drive(data)
+                    time_now = datetime.now()
+                    t_disp = int((time_start - time_now).total_seconds() * 1000)
+                    data_log.add_data([t_disp, int(viewable), data["cd"], data["fd"], power, turn])
                 else:
                     cont.drive(0.0, 0.0)
         except Exception as err:
@@ -283,16 +299,26 @@ def load_model():
 
 
 def enable_car():
-    global enable_var, generation_var, trial_var
+    global enable_var, enabled_var, generation_var, trial_var, data_log
     enable_var.set(True)
+    enabled_var.set("Enabled")
+    c_gen = int(generation_var.get())
+    c_trial = int(trial_var.get())
+
+    data_log.set_gen(c_gen)
+    data_log.set_trial(c_trial)
 
     update_car()  # Send the new configurations to the car
 
 
 def disable_car():
-    global enable_var, generation_var, trial_var
+    global enable_var, enabled_var, generation_var, trial_var, data_log, time_start
     enable_var.set(False)
+    enabled_var.set("Disabled")
 
+    data_log.save_data()
+
+    time_start = datetime.now()
     update_car()  # Send the new configurations to the car
 
 
@@ -303,6 +329,7 @@ if __name__ == "__main__":
     stream_url = configs["display"]["camera_url"]
     width = configs["display"]["width"]
     height = configs["display"]["height"]
+    data_log = DataLogger(configs["gens"]["data_file"])
 
     log.info("Attempting to connect to the controller")
     cont = Controller(configs)
@@ -357,6 +384,7 @@ if __name__ == "__main__":
     enable_var = IntVar(root)
     generation_var = StringVar(root)
     trial_var = StringVar(root)
+    enabled_var = StringVar(root)
 
     # MIN HSV
     Label(mainframe, text="Min H").grid(column=0, row=1)
@@ -391,20 +419,34 @@ if __name__ == "__main__":
     enable_button = Button(mainframe, text="Enable", command=enable_car)
     enable_button.grid(column=1, row=5)
 
-    disable_button = Button(mainframe, text="Enable", command=disable_car)
+    disable_button = Button(mainframe, text="Disable", command=disable_car)
     disable_button.grid(column=1, row=6)
 
+    enabled_var.set("Disabled")
+    enabled_label = Label(mainframe, textvariable=enabled_var)
+    enabled_label.grid(column=2, row=7)
+
+    Label(mainframe, text="Data and Modeling").grid(column=1, row=7)
+
     save_model_button = Button(mainframe, text="Save Model", command=save_model)
-    save_model_button.grid(column=1, row=7)
+    save_model_button.grid(column=1, row=8)
 
     load_model_button = Button(mainframe, text="Load Model", command=load_model)
-    load_model_button.grid(column=1, row=8)
+    load_model_button.grid(column=1, row=9)
 
-    Label(mainframe, text="Generation").grid(column=1, row=9)
+    Label(mainframe, text="Generation").grid(column=1, row=10)
     generation_entry = Entry(mainframe, textvariable=generation_var)
+    generation_entry.grid(column=1, row=11)
 
-    Label(mainframe, text="Trial").grid(column=1, row=10)
+    Label(mainframe, text="Trial").grid(column=1, row=12)
     trial_entry = Entry(mainframe, textvariable=trial_var)
+    trial_entry.grid(column=1, row=13)
+
+    t_down_button = Button(mainframe, text="Trail Down", command=lambda: trial_var.set(str(int(trial_var.get()) - 1)))
+    t_down_button.grid(column=0, row=13)
+
+    t_up_button = Button(mainframe, text="Trial Up", command=lambda: trial_var.set(str(int(trial_var.get()) + 1)))
+    t_up_button.grid(column=2, row=13)
 
     # LINE FILTERING
     """

@@ -1,6 +1,12 @@
 {
+  "gens": {
+    "trial": 0,
+    "num": 0,
+    "data_file": "/home/smerkous/ML/mlcar/client/data_logs/generation_%d"
+  }, 
+  "ser_baud": 115200,
+  "address": "tcp://mlcar:9090",
   "ser_port": "/dev/ttyUSB0", 
-  "ser_baud": 115200, 
   "display": {
     "camera_url": "http://mlcar:8080", 
     "width": 640, 
@@ -17,6 +23,5 @@
     "blur": 23, 
     "max_angle": 90, 
     "max_s": 255
-  }, 
-  "address": "tcp://mlcar:9090"
+  }
 }
