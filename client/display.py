@@ -15,8 +15,8 @@ from mlcar.ai import AI, save_model_location
 from mlcar.communicate import Communicate
 from mlcar.configs import load_configs, get_configs, save_configs, linear_map
 from mlcar.controller import Controller
+from mlcar.data import DataLogger
 from mlcar.logger import Logger
-from mlcar.logging.data import DataLogger
 
 log = Logger("display")
 
@@ -49,6 +49,7 @@ generation_var = None
 trial_var = None
 enable_var = None
 enabled_var = None
+capture_var = None
 prev_blur = 1
 blur_var = None
 width = None
@@ -108,7 +109,7 @@ def ai_drive(data):
 
 
 def communicate():
-    global coms, cont, enabled, agent
+    global coms, cont, enabled, agent, capture_var, time_start, previous_future
     agent = AI()
     sleep(1)
     while True:
@@ -133,8 +134,10 @@ def communicate():
                         pass
                         # ai_drive(data)
                     time_now = datetime.now()
-                    t_disp = int((time_start - time_now).total_seconds() * 1000)
-                    data_log.add_data([t_disp, int(viewable), data["cd"], data["fd"], power, turn])
+                    t_disp = int((time_now - time_start).total_seconds() * 1000)
+                    data_log.add_data([t_disp, int(viewable), data["cd"], abs(data["cd"]), data["fd"], abs(data["fd"]),
+                                       power, abs(power), turn, abs(turn)])
+                    capture_var.set(str(data_log.get_data_count()))
                 else:
                     cont.drive(0.0, 0.0)
         except Exception as err:
@@ -299,7 +302,7 @@ def load_model():
 
 
 def enable_car():
-    global enable_var, enabled_var, generation_var, trial_var, data_log
+    global enable_var, enabled_var, generation_var, trial_var, data_log, time_start
     enable_var.set(True)
     enabled_var.set("Enabled")
     c_gen = int(generation_var.get())
@@ -308,18 +311,108 @@ def enable_car():
     data_log.set_gen(c_gen)
     data_log.set_trial(c_trial)
 
+    time_start = datetime.now()
     update_car()  # Send the new configurations to the car
 
 
-def disable_car():
-    global enable_var, enabled_var, generation_var, trial_var, data_log, time_start
+def disable_car(complete):
+    global enable_var, enabled_var, generation_var, trial_var, data_log, time_start, enabled
+    if not bool(enable_var.get()):
+        update_car()
+
+    enabled = False
     enable_var.set(False)
     enabled_var.set("Disabled")
 
+    # Final data sampling
+    time_now = datetime.now()
+    t_disp = int((time_now - time_start).total_seconds() * 1000)
+
+    # Get the total count
+    data_count = data_log.get_data_count()
+
+    # Error sampling
+    error_data = data_log.get_v_data("C")
+    low_error, high_error = data_log.get_peaks(error_data)
+    avg_error = data_log.get_average(error_data)
+    median_error = data_log.get_median(error_data)
+    a_low_error, a_high_error = data_log.get_peaks(error_data, True)
+    a_avg_error = data_log.get_average(error_data, True)
+    a_median_error = data_log.get_median(error_data, True)
+    deviation_error = data_log.get_standard_deviation(error_data)
+
+    # Power sampling
+    power_data = data_log.get_v_data("G")
+    low_power, high_power = data_log.get_peaks(power_data)
+    avg_power = data_log.get_average(power_data)
+    median_power = data_log.get_median(power_data)
+    a_low_power, a_high_power = data_log.get_peaks(power_data, True)
+    a_avg_power = data_log.get_average(power_data, True)
+    a_median_power = data_log.get_median(power_data, True)
+    deviation_power = data_log.get_standard_deviation(power_data)
+
+    # Turn sampling
+    turn_data = data_log.get_v_data("I")
+    low_turn, high_turn = data_log.get_peaks(turn_data)
+    avg_turn = data_log.get_average(turn_data)
+    median_turn = data_log.get_median(turn_data)
+    a_low_turn, a_high_turn = data_log.get_peaks(turn_data, True)
+    a_avg_turn = data_log.get_average(turn_data, True)
+    a_median_turn = data_log.get_median(turn_data, True)
+    deviation_turn = data_log.get_standard_deviation(turn_data)
+
+    f_data = data_log.get_data(2)
+    f_data += [t_disp, data_count, avg_error, low_error, high_error, avg_power, low_power, high_power,
+               avg_turn, low_turn, high_turn, int(complete)]
+    data_log.set_data(2, f_data)
+
+    # Advanced Error
+    s_data = data_log.get_data(4)
+    s_data += [None, "Absolute Average Error", "Absolute Median Error", "Absolute Low Error", "Absolute High Error",
+               "Median Error"]
+    data_log.set_data(4, s_data)
+
+    g_data = data_log.get_data(5)
+    g_data += [None, a_avg_error, a_median_error, a_low_error, a_high_error, median_error]
+    data_log.set_data(5, g_data)
+
+    # Advanced Power
+    s_data = data_log.get_data(7)
+    s_data += [None, "Absolute Average Power", "Absolute Median Power", "Absolute Low Power", "Absolute High Power",
+               "Median Power"]
+    data_log.set_data(7, s_data)
+
+    g_data = data_log.get_data(8)
+    g_data += [None, a_avg_power, a_median_power, a_low_power, a_high_power, median_power]
+    data_log.set_data(8, g_data)
+
+    # Advanced Turn
+    s_data = data_log.get_data(10)
+    s_data += [None, "Absolute Average Turn", "Absolute Median Turn", "Absolute Low Turn", "Absolute High Turn",
+               "Median Turn"]
+    data_log.set_data(10, s_data)
+
+    g_data = data_log.get_data(11)
+    g_data += [None, a_avg_turn, a_median_turn, a_low_turn, a_high_turn, median_turn]
+    data_log.set_data(11, g_data)
+
+    # Standard deviation
+    s_data = data_log.get_data(13)
+    s_data += [None, "Deviation Error", "Deviation Power", "Deviation Turn"]
+    data_log.set_data(13, s_data)
+
+    g_data = data_log.get_data(14)
+    g_data += [None, deviation_error, deviation_power, deviation_turn]
+    data_log.set_data(14, g_data)
+
+    data_log.create_line_graph(title="Absolute", col_ref=["D", "F", "H", "J"], location="L16")
+    data_log.create_line_graph(title="Scaled", col_ref=["B", "C", "E", "G", "I"], location="L46")
+
+    # Save the spreadsheet data
     data_log.save_data()
 
-    time_start = datetime.now()
-    update_car()  # Send the new configurations to the car
+    # Send the new configurations to the car
+    update_car()
 
 
 if __name__ == "__main__":
@@ -385,6 +478,7 @@ if __name__ == "__main__":
     generation_var = StringVar(root)
     trial_var = StringVar(root)
     enabled_var = StringVar(root)
+    capture_var = StringVar(root)
 
     # MIN HSV
     Label(mainframe, text="Min H").grid(column=0, row=1)
@@ -419,12 +513,19 @@ if __name__ == "__main__":
     enable_button = Button(mainframe, text="Enable", command=enable_car)
     enable_button.grid(column=1, row=5)
 
-    disable_button = Button(mainframe, text="Disable", command=disable_car)
+    disable_button = Button(mainframe, text="Disable (Failure)", command=lambda: disable_car(False))
     disable_button.grid(column=1, row=6)
 
     enabled_var.set("Disabled")
     enabled_label = Label(mainframe, textvariable=enabled_var)
     enabled_label.grid(column=2, row=7)
+
+    capture_var.set("0")
+    capture_label = Label(mainframe, textvariable=capture_var)
+    capture_label.grid(column=2, row=8)
+
+    disable_complete_button = Button(mainframe, text="Disable (Complete Course)", command=lambda: disable_car(True))
+    disable_complete_button.grid(column=2, row=9)
 
     Label(mainframe, text="Data and Modeling").grid(column=1, row=7)
 

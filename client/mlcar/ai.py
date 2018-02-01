@@ -1,11 +1,11 @@
 from datetime import datetime
 from os.path import splitext
 
-from tensorforce.agents import PPOAgent
-
 from configs import linear_map
 from logger import Logger
 from neuralnet.genetic import *
+
+# from tensorforce.agents import PPOAgent
 
 min_car_speed = 0.1
 max_car_speed = 0.135
@@ -32,7 +32,8 @@ breeds = [
 
 
 def build_agent():
-    return PPOAgent(
+    return None
+    """PPOAgent(
         states_spec=dict(type="float", shape=(2,)),
         actions_spec=dict(continuous=True, type="float", shape=(2,),
                           min_value=min_car_speed, max_value=max_car_speed),
@@ -55,7 +56,7 @@ def build_agent():
         likelihood_ratio_clipping=0.15,
         summary_spec=None,
         distributed_spec=None
-    )
+    )"""
 
 
 class AI(object):
