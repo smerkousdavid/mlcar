@@ -1,27 +1,27 @@
 {
   "gens": {
-    "data_file": "/home/smerkous/ML/mlcar/client/data_logs/generation_%d.xlsx",
-    "trial": 0,
-    "num": 0
-  },
-  "ser_baud": 115200,
+    "data_file": "/home/smerkous/ML/mlcar/client/data_logs/generation_%d.xlsx", 
+    "trial": 15, 
+    "num": 25
+  }, 
+  "ser_baud": 115200, 
   "address": "tcp://mlcar:9090", 
   "ser_port": "/dev/ttyUSB0", 
   "display": {
     "camera_url": "http://mlcar:8080", 
-    "width": 640, 
-    "height": 320
+    "height": 320, 
+    "width": 640
   }, 
   "vision": {
-    "stream": 3, 
-    "min_v": 128, 
-    "max_h": 154, 
-    "min_s": 41, 
-    "max_v": 255, 
-    "min_h": 38,
     "max_s": 255, 
-    "blur": 23, 
-    "max_angle": 90,
-    "min_angle": 0
+    "stream": 1, 
+    "min_v": 146, 
+    "max_h": 86, 
+    "min_s": 23, 
+    "max_v": 255, 
+    "min_h": 0, 
+    "min_angle": 0, 
+    "blur": 29, 
+    "max_angle": 90
   }
 }

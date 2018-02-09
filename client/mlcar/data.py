@@ -26,6 +26,8 @@ class DataLogger(object):
         else:
             log.info("Creating the new workbook")
             self._wb = Workbook()
+            self._wb.active.append(["Trial", "Success", "Total Time (Millis)", "Absolute Average Error",
+                                   "Absolute Median Error", "Absolute Low Error", "Absolute High Error"])
         self._s = self._wb.active
         self._s.title = "gen_%d" % gen
         self._c_row = 0
@@ -112,6 +114,19 @@ class DataLogger(object):
     def get_data_count(self):
         return self._c_row
 
+    def get_trial(self):
+        return "t_%d" % self._trial
+
+    def set_meta_data(self, data):
+        s = self._wb.get_sheet_by_name("gen_%d" % self._gen)
+        trials = [d.value for d in list(s["A"])]
+        for i, v in enumerate(trials):
+            if ("t_%d" % self._trial) in v:
+                for col, val in enumerate(data, start=1):
+                    s.cell(row=i + 1, column=col).value = val
+                return
+        s.append(data)
+
     def create_line_graph(self, title, location, y_axis="Proportions", col_ref=("B",)):
         l = LineChart()
         l.title = title
@@ -126,7 +141,7 @@ class DataLogger(object):
         colors = ["009688", "03A9F4", "673AB7", "FFC107", "FF5722", "607D8B"]
 
         for i in range(0, len(list(l.series))):
-            pass
+            l.series[i].graphicalProperties.line.solidFill = colors[i]
 
         time_stamps = Reference(self._s, range_string="t_%d!A2:A%d" % (self._trial, self._c_row + 1))
         l.set_categories(time_stamps)
@@ -147,6 +162,15 @@ class DataLogger(object):
                     dims[cell.column] = max((dims.get(cell.column, 0), len("%s" % cell.value)))
         for col, value in dims.items():
             self._s.column_dimensions[col].width = value
+
+        dims = {}
+        s = self._wb.get_sheet_by_name("gen_%d" % self._gen)
+        for row in s:
+            for cell in row:
+                if cell.value:
+                    dims[cell.column] = max((dims.get(cell.column, 0), len("%s" % cell.value)))
+        for col, value in dims.items():
+            s.column_dimensions[col].width = value
 
         # Save the file
         self._wb.save(self._fb % self._gen)

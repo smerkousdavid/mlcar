@@ -6,7 +6,7 @@ Date: Tue Nov 21 2017
 
 The neuralnet common functions
 """
-from mlcar.neuralnet.errors import *
+from errors import *
 from StringIO import StringIO
 import numpy as np
 

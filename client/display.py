@@ -72,30 +72,32 @@ def clean_drive(current, future):
             map = 0.06
     else:
     """
-    return linear_map(abs(future), 0, 0.9, 0.12, 0.095)
+    return linear_map(abs(future), 0, 0.9, 0.085, 0.0725)
 
 
 def clean_turn(from_camera):
     if 0.02 > from_camera > -0.02:
         return 0.0
 
-    if from_camera > 0.4:
-        return 0.4
+    if from_camera > 0.3:
+        return 0.3
 
-    if from_camera < -0.4:
-        return -0.4
+    if from_camera < -0.3:
+        return -0.3
 
     # sign = 1 if from_camera < 0 else -1
     # shift = -2 if from_camera < 0 else 2
     # return sign * (2 * (1 / (1 + abs(from_camera)))) + shift
     # return from_camera * (1 / (1 + abs(from_camera)))
-    return from_camera * 0.8  # pow(from_camera, 3) + (0.5 * from_camera)
+    return from_camera * 0.75  # pow(from_camera, 3) + (0.5 * from_camera)
 
 
-def static_drive(data):
+def static_drive(data, time_elapsed):
     global cont
     power = clean_drive(data["cd"], data["fd"])
-    turn = clean_turn(((-data["cd"] * 0.3) + (-data["fd"] * 1.6)) / 2.0)
+    if time_elapsed < 400:
+        power = 0.15
+    turn = clean_turn(((-data["cd"] * 0.6) + (-data["fd"] * 1.3)) / 2.0)
     cont.drive(power, turn)
     return power, turn
 
@@ -104,13 +106,12 @@ def ai_drive(data):
     global cont, agent
     actions = agent.run(data["cd"], data["fd"])
     log.info("Predictions: %s" % str(actions))
-    cont.drive(actions[0], actions[1])
     return actions[0], actions[1]
 
 
 def communicate():
     global coms, cont, enabled, agent, capture_var, time_start, previous_future
-    agent = AI()
+    agent = AI(is_linear=True)
     sleep(1)
     while True:
         try:
@@ -120,7 +121,12 @@ def communicate():
             else:
                 log.debug("Cpos: %.5f --- Fpos: %.5f" % (data["cd"], data["fd"]))
                 if enabled:
-                    power, turn = static_drive(data)
+                    time_now = datetime.now()
+                    t_disp = int((time_now - time_start).total_seconds() * 1000)
+                    # power, turn = static_drive(data, t_disp)
+                    power, turn = ai_drive(data)
+                    if t_disp < 400:
+                        power = 0.15
                     viewable = True
                     if data["cd"] == -2.0 or data["fd"] == -2.0 or \
                                     "0.09091" in ("%.5f" % data["cd"]) or \
@@ -130,11 +136,10 @@ def communicate():
                         data["fd"] = -1.0
                         viewable = False
                         # agent.no_lane()
+                        cont.drive(0, 0)
                     else:
-                        pass
+                        cont.drive(power, turn)
                         # ai_drive(data)
-                    time_now = datetime.now()
-                    t_disp = int((time_now - time_start).total_seconds() * 1000)
                     data_log.add_data([t_disp, int(viewable), data["cd"], abs(data["cd"]), data["fd"], abs(data["fd"]),
                                        power, abs(power), turn, abs(turn)])
                     capture_var.set(str(data_log.get_data_count()))
@@ -230,7 +235,7 @@ def open_stream():
 
 
 def pull_frame():
-    global stream, stream_url, frame, mainframe, selector_enable
+    global stream, stream_url, frame, mainframe, selector_enable, previous_frame
     fail_count = 0
     data = ''
     while True:
@@ -302,7 +307,7 @@ def load_model():
 
 
 def enable_car():
-    global enable_var, enabled_var, generation_var, trial_var, data_log, time_start
+    global enable_var, enabled_var, generation_var, trial_var, data_log, time_start, agent
     enable_var.set(True)
     enabled_var.set("Enabled")
     c_gen = int(generation_var.get())
@@ -311,8 +316,20 @@ def enable_car():
     data_log.set_gen(c_gen)
     data_log.set_trial(c_trial)
 
+    if agent is None:
+        enabled_var.set("The AI failed to start!")
+    agent.set_breed(c_trial)
+
     time_start = datetime.now()
     update_car()  # Send the new configurations to the car
+
+
+def breed_ai():
+    global agent, trial_var
+    if agent is None:
+        enabled_var.set("The AI failed to breed! (%s)" % enabled_var.get())
+    agent.breed_networks()
+    trial_var.set("0")
 
 
 def disable_car(complete):
@@ -407,9 +424,24 @@ def disable_car(complete):
 
     data_log.create_line_graph(title="Absolute", col_ref=["D", "F", "H", "J"], location="L16")
     data_log.create_line_graph(title="Scaled", col_ref=["B", "C", "E", "G", "I"], location="L46")
+    data_log.create_line_graph(title="Important", col_ref=["B", "D"], location="L76")
+    # Set the generation metadata
+    data_log.set_meta_data([data_log.get_trial(), int(complete), t_disp, a_avg_error, a_median_error, a_low_error,
+                            a_high_error])
 
     # Save the spreadsheet data
     data_log.save_data()
+
+    # Generate the car's efficiency rating
+    if agent is not None:
+        try:
+            fitness = 1 - abs((1 / (10 - (t_disp / 1000)))) # Set the target second count to be X seconds
+        except:
+            fitness = 0
+        fitness -= a_high_error * 2  # Make sure are absolute error isn't horrible
+        fitness -= a_avg_error  # Remove the fitness by the average error
+        fitness += (1 - a_low_error) / 2  # If it managed to stay in the middle, then kudos to the car
+        agent.set_fitness(fitness, complete, -a_median_error)
 
     # Send the new configurations to the car
     update_car()
@@ -539,6 +571,9 @@ if __name__ == "__main__":
     generation_entry = Entry(mainframe, textvariable=generation_var)
     generation_entry.grid(column=1, row=11)
 
+    breed_networks = Button(mainframe, text="Breed Networks", command=breed_ai)
+    breed_networks.grid(column=2, row=11)
+
     Label(mainframe, text="Trial").grid(column=1, row=12)
     trial_entry = Entry(mainframe, textvariable=trial_var)
     trial_entry.grid(column=1, row=13)
@@ -548,6 +583,7 @@ if __name__ == "__main__":
 
     t_up_button = Button(mainframe, text="Trial Up", command=lambda: trial_var.set(str(int(trial_var.get()) + 1)))
     t_up_button.grid(column=2, row=13)
+
 
     # LINE FILTERING
     """

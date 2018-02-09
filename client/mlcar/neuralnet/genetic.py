@@ -1,8 +1,8 @@
 from __future__ import unicode_literals
-from mlcar.neuralnet.network import NeuralNetwork
-from mlcar.neuralnet.abstract import AbstractNeuralNetwork
-from mlcar.neuralnet.errors import EvolutionError, BreedingError
-from mlcar.neuralnet.common import average_breed
+from network import NeuralNetwork
+from abstract import AbstractNeuralNetwork
+from errors import EvolutionError, BreedingError
+from common import average_breed
 from copy import deepcopy as cpdata
 from random import randint
 from h5py import File
@@ -41,6 +41,7 @@ class NewRandomBreed(BaseBreed):
         super(NewRandomBreed, self).__init__()
 
     def breed(self, fitness, networks, base_network, nn_type):
+        base_network = cpdata(base_network)
         if nn_type == 0:
             base_network.generate()
         elif nn_type == 1:
@@ -128,6 +129,7 @@ class Evolution(object):
         self._breed_types = breeds
         self._breeds = [cpdata(self._base_breed) for _ in range(len(breeds))]
         self._fitness = [0] * len(breeds)
+        self._completed = [False] * len(breeds)
         self._current_breed = start_breed
 
     def create(self):
@@ -152,9 +154,12 @@ class Evolution(object):
         # ADD FAVORING fitness BREEDING METHOD
         for i in range(len(self._breed_types)):
             try:
-                b_t = self._breed_types[i]
-                baby_breed = b_t.breed(networks[0], networks[1], self._base_breed, self._nn_type)
-                self._breeds[i] = baby_breed
+                if self._completed[i]:
+                    b_t = self._breed_types[i]
+                    baby_breed = b_t.breed(networks[0], networks[1], self._base_breed, self._nn_type)
+                    self._breeds[i] = baby_breed
+                else:
+                    self._breeds[i] = NewRandomBreed().breed(0, 0, self._base_breed, self._nn_type)
             except Exception as err:
                 raise BreedingError("Failed to breed index %d! %s" % (i, str(err)))
 
@@ -174,8 +179,9 @@ class Evolution(object):
             return self._breeds[self._current_breed].run(*inputs)
         return self._breeds[self._current_breed]
 
-    def set_fitness(self, fitness):
+    def set_fitness(self, fitness, completed):
         self._fitness[self._current_breed] = fitness
+        self._completed[self._current_breed] = completed
 
     def add_fitness(self, fitness):
         self._fitness[self._current_breed] += fitness
@@ -251,7 +257,7 @@ class Evolution(object):
             self._max_gens = meta_data["m_gen"][0]
             self._current_gen = meta_data["c_gen"][0]
             self._save_gens = meta_data["save_gens"][0]
-        self._fitness = meta_data["fitness"]
+        self._fitness = list(meta_data["fitness"])
 
         # Breeds
         breeds = h_file["breeds"]

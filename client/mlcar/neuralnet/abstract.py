@@ -8,9 +8,9 @@ The neural network abstraction layer
 """
 
 # Local package imports
-import mlcar.neuralnet.errors as errors
-import mlcar.neuralnet.common as common
-from mlcar.neuralnet.network import NeuralNetwork
+import errors as errors
+import common as common
+from network import NeuralNetwork
 
 
 class AbstractNeuralNetwork(NeuralNetwork):

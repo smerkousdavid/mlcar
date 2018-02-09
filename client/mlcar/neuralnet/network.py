@@ -8,8 +8,8 @@ The neural network core
 """
 
 # Local package imports
-import mlcar.neuralnet.errors as errors
-import mlcar.neuralnet.common as common
+import errors
+import common
 
 # Very few external depends
 from copy import deepcopy as cpdata
