@@ -6,6 +6,9 @@ from threading import Thread
 from time import sleep
 from ttk import Style, Label, OptionMenu, Button
 
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 import cv2
 import numpy as np
 from PIL import Image, ImageTk

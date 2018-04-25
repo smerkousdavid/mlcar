@@ -12,6 +12,10 @@ from os.path import dirname, realpath, isdir, exists
 from os import makedirs
 from time import strftime
 from sys import stdout
+import coloredlogs
+
+# Use the colored logs
+coloredlogs.install()
 
 # Define logging characteristics
 LOGGER_NAME = "MLCAR"
@@ -38,7 +42,7 @@ LOGGER_CONSOLE_HANDLER = StreamHandler(stdout)
 LOGGER_CONSOLE_HANDLER.setFormatter(LOGGER_FORMAT)
 LOGGER = getLogger(LOGGER_NAME)
 LOGGER.addHandler(LOGGER_FILE_HANDLER)
-LOGGER.addHandler(LOGGER_CONSOLE_HANDLER)
+#LOGGER.addHandler(LOGGER_CONSOLE_HANDLER)
 
 
 class Logger(object):

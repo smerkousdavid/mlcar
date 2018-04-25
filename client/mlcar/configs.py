@@ -6,6 +6,7 @@ Developed by: David Smerkous
 
 from json import loads, dumps
 from os.path import dirname
+from pygments import highlight, lexers, formatters
 
 from logger import Logger
 
@@ -34,7 +35,9 @@ def dump_configs(conf):
     """
 
     try:
-        log.info("Configurations:\n%s" % dumps(conf, indent=4))
+        formatted = dumps(conf, sort_keys=True, indent=4)
+        colorful_json = highlight(unicode(formatted, "UTF-8"), lexers.JsonLexer(), formatters.TerminalFormatter())
+        log.info("Configurations:\n%s" % colorful_json)
     except Exception as err:
         log.error("Failed to dump json! (err: %s)" % str(err))
 

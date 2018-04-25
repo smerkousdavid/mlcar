@@ -1,3 +1,2 @@
 pyserial
 h5py
-nanomsg-python
